@@ -1,0 +1,9 @@
+---
+
+ - hosts: db
+   become: yes
+   become_user: root
+   vars_files:
+     - "db2/vars/main.yml"
+   roles:
+     - db2	

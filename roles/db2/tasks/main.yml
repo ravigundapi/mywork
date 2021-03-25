@@ -1,0 +1,62 @@
+---
+
+  - name: Check postgresql-11.service status
+    systemd: state=started name=postgresql-11.service
+
+  - name: netstat
+    shell: /bin/netstat -tln |  grep ":{{ item }} " | sed -e 's/.*\///'
+    register:
+      netstat_result
+    with_items:
+      - 5432
+    changed_when: false
+
+  - name: print result
+    debug:
+      msg: "for port: {{ item.item }}, netstat stdout was: {{ item.stdout }}"
+    with_items:
+      - "{{ netstat_result.results }}"
+
+  - name: Setup postgres database
+    become: yes
+    become_user: postgres
+    postgresql_db: name={{ database_name }} state=present
+
+  - name: Ensure user has access to the database 
+    become_user: postgres
+    postgresql_user: db={{ database_name }}
+                 name={{ database_user }}
+                 password={{ database_password }}
+                 priv=ALL
+                 state=present
+
+  - name: Copy file with owner and permissions
+    template:
+      src: pg_hba.conf.j2
+      dest: /var/lib/pgsql/11/data/pg_hba.conf
+      owner: postgres
+      group: postgres
+      mode: '0777'
+      backup: yes
+
+  - name: Verify postgresql.conf listen_address
+    lineinfile:
+      path: /var/lib/pgsql/11/data/postgresql.conf
+      regex: "^(.*)#listen_addresses = 'localhost(.*)$"
+      line: "listen_addresses = '*'"
+      backup: yes
+
+  - name: Verify postgresql.conf port 5432
+    replace:
+      path: /var/lib/pgsql/11/data/postgresql.conf
+      regexp: '#port = 5432'
+      replace: 'port = 5432'
+      backup: yes
+  
+  - name: Create /root/postgrest.conf
+    template:
+      src: postgrest.conf.j2
+      dest: /root/postgrest.conf
+      owner: root
+      group: root
+
