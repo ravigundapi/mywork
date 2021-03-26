@@ -39,6 +39,9 @@
       mode: '0777'
       backup: yes
 
+  - name: Check postgresql-11.service status
+    systemd: state=restarted name=postgresql-11.service
+
   - name: Verify postgresql.conf listen_address
     lineinfile:
       path: /var/lib/pgsql/11/data/postgresql.conf
@@ -59,4 +62,10 @@
       dest: /root/postgrest.conf
       owner: root
       group: root
-
+ 
+  - name: Start the postgrest service
+    shell: "/usr/postgrest /root/postgrest.conf &"
+    register: cmdoutput
+    tags: cmdoutput
+  - debug: msg="{{cmdoutput.stdout}}"
+ 
