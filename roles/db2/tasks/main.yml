@@ -1,4 +1,62 @@
 ---
+  - name: Getting Setuptools-7.0.tar.gz binary
+    copy:
+      src: ../files/setuptools-7.0.tar
+      #dest: /usr/setuptools-7.0.tar.gz
+      dest: /usr/
+
+  - name: Unzipping Setuptools-7.0.tar.gz binary
+    unarchive:
+      src: /usr/setuptools-7.0.tar
+      dest: /usr/
+      remote_src: yes
+      mode: 0777
+
+  - name: Copy setuptools.sh to destination
+    template:
+      src: setuptools.j2
+      dest: /root/setuptools.sh
+      owner: root
+      group: root
+      mode: '0777'
+
+  - name: Change directory to /usr/setuptools-7.0
+    command: /root/setuptools.sh
+    register: output
+    tags: output
+    args:
+      chdir: /usr/setuptools-7.0/
+  - debug: msg="{{output.stdout}}"
+
+  - name: Copy get-pip.py to /usr
+    copy:
+      src: ../files/get-pip.py
+      dest: /usr/
+      owner: root
+      group: root
+      mode: '0777'
+
+  - name: Copy get-pip.j2 to destination
+    template:
+      src: get-pip.j2
+      dest: /root/get-pip.sh
+      owner: root
+      group: root
+      mode: '0777'
+
+  - name: Run get-pip.py
+    command: /root/get-pip.sh
+    register: pipoutput
+    tags: pipoutput
+    args:
+      chdir: /usr/
+  - debug: msg="{{pipoutput.stdout}}"
+
+  - name: pip install psycopg2-binary
+    shell: "pip install psycopg2-binary"
+    register: cmdpsycopg2output
+    tags: cmdpsycopg2output
+  - debug: msg="{{cmdpsycopg2output.stdout}}"
 
   - name: Check postgresql-11.service status
     systemd: state=started name=postgresql-11.service
@@ -22,7 +80,7 @@
     become_user: postgres
     postgresql_db: name={{ database_name }} state=present
 
-  - name: Ensure user has access to the database 
+  - name: Ensure user has access to the database
     become_user: postgres
     postgresql_user: db={{ database_name }}
                  name={{ database_user }}
@@ -55,17 +113,45 @@
       regexp: '#port = 5432'
       replace: 'port = 5432'
       backup: yes
-  
+
   - name: Create /root/postgrest.conf
     template:
       src: postgrest.conf.j2
       dest: /root/postgrest.conf
       owner: root
       group: root
+
+  - name: Copy postgrest script to /opt
+    template:
+     src: optpostgrest.j2
+     dest: /opt/postgrest.sh
+     owner: root
+     group: root
+     mode: 0755
  
-  - name: Start the postgrest service
-    shell: "/usr/postgrest /root/postgrest.conf &"
-    register: cmdoutput
-    tags: cmdoutput
-  - debug: msg="{{cmdoutput.stdout}}"
- 
+  - name: Copy postgrest service file to destination
+    template: 
+      src: postgrest.service.j2
+      dest: /usr/lib/systemd/system/postgrest.service 
+  
+  - name: Create symlink
+    file: 
+      src: /usr/lib/systemd/system/postgrest.service
+      dest: /etc/systemd/system/multi-user.target.wants/postgrest.service
+      owner: root
+      group: root
+      state: link
+   
+  - name: Copy /usr/postgrest
+    file:
+      src: /usr/postgrest 
+      dest: /usr/bin/postgrest
+      owner: root
+      group: root
+      mode: 0755
+
+  - name: Enable postgrest service
+    systemd:
+      name: postgrest.service
+      state: started
+      enabled: yes

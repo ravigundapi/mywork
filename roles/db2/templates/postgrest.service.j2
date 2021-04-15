@@ -1,0 +1,20 @@
+#!/bin/bash
+[Unit]
+Description=postgrestservice
+After=network.target
+#StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=root
+#Restart=always
+#RestartSec=1
+#User=centos
+TimeoutStartSec=900
+ExecStartPre=/bin/sleep 500
+WorkingDirectory=/opt
+#KillMode = process
+ExecStart=/opt/postgrest.sh
+
+[Install]
+WantedBy=multi-user.target

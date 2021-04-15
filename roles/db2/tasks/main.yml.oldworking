@@ -22,18 +22,13 @@
     become_user: postgres
     postgresql_db: name={{ database_name }} state=present
 
-  - name: Ensure user has access to the database 
+  - name: Ensure user has access to the database
     become_user: postgres
     postgresql_user: db={{ database_name }}
                  name={{ database_user }}
                  password={{ database_password }}
                  priv=ALL
                  state=present
-
-  - name: Copy /var/lib/pgsql/11/data/pg_hba.conf
-    copy:
-      src: /var/lib/pgsql/11/data/pg_hba.conf
-      dest: /var/lib/pgsql/11/data/pg_hba.conf.bak
 
   - name: Copy file with owner and permissions
     template:
@@ -42,34 +37,34 @@
       owner: postgres
       group: postgres
       mode: '0777'
+      backup: yes
+
+  - name: Check postgresql-11.service status
+    systemd: state=restarted name=postgresql-11.service
 
   - name: Verify postgresql.conf listen_address
     lineinfile:
       path: /var/lib/pgsql/11/data/postgresql.conf
-      insertafter: "#listen_addresses = 'localhost'"
+      regex: "^(.*)#listen_addresses = 'localhost(.*)$"
       line: "listen_addresses = '*'"
       backup: yes
 
   - name: Verify postgresql.conf port 5432
-    lineinfile:
+    replace:
       path: /var/lib/pgsql/11/data/postgresql.conf
-      insertbefore: "#port=5432"
-      line: "port = 5432"
+      regexp: '#port = 5432'
+      replace: 'port = 5432'
       backup: yes
 
+  - name: Create /root/postgrest.conf
+    template:
+      src: postgrest.conf.j2
+      dest: /root/postgrest.conf
+      owner: root
+      group: root
 
-#  - name: Verify postgresql.conf
-#    lineinfile:
-#      path: /var/lib/pgsql/11/data/postgresql.conf
-#      regexp: "listen_addresses = '*'"
-#      regexp: "#listen_addresses = 'localhost'         # what IP address(es) to listen on;"
-#      line: "listen_addresses = '*'"
-#      backup: yes
-#
-#  - name: Verify postgresql.conf
-#    lineinfile:
-#      path: /var/lib/pgsql/11/data/postgresql.conf
-#      regexp: "listen_addresses = '*'"
-#      regexp: "#port = 5432                            # (change requires restart)"
-#      line: "port = 5432"
-#      backup: yes
+  - name: Start the postgrest service
+    shell: "/usr/postgrest /root/postgrest.conf &"
+    register: cmdoutput
+    tags: cmdoutput
+  - debug: msg="{{cmdoutput.stdout}}"
